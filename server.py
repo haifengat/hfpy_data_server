@@ -6,9 +6,8 @@ __mtime__ = '20180911'
 
 import zmq
 import gzip
-import pandas as pd
+from pandas import read_sql_query
 from pandas import DataFrame
-from zmq import Socket
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 import time
@@ -19,18 +18,19 @@ import sys
 class Server(object):
 
     def __init__(self, port):
-        self.pg: Engine = None
-        self.pg = create_engine('postgresql://postgres:kingisgod.@192.168.52.219:5432/future')
-        # if 'postgres_config' in cfg:
-        #     cfg_pg = cfg['postgres_config']
-        #     self.pg = create_engine('postgresql://{}:{}@{}:{}/{}'.format(cfg_pg['user'], cfg_pg['pwd'], cfg_pg['host'], cfg_pg['port'], cfg_pg['db']))
+        self.pg_conn_str = ''
+        cfg = json.load(open('./config.json', 'r', encoding='utf-8'))
+        if 'postgres_config' in cfg:
+            cfg_pg = cfg['postgres_config']
+            self.pg_conn_str = 'postgresql://{}:{}@{}:{}/{}'.format(cfg_pg['user'], cfg_pg['pwd'], cfg_pg['host'], cfg_pg['port'], cfg_pg['db'])
+        self.pg: Engine = create_engine(self.pg_conn_str)
 
-        context: Socket = zmq.Context(1)
+        context = zmq.Context(1)
         self.server = context.socket(zmq.REP)
         self.server.bind('tcp://*:{}'.format(port))
 
     def run(self):
-
+        print('listen to port: {}'.format(self.server.LAST_ENDPOINT.decode()))
         while True:
             request = self.server.recv_json()  # .recv_string()
             print(request)
@@ -61,9 +61,10 @@ class Server(object):
             sql = 'select instrument, rate from future_config.rate_000'
         else:
             sys.exit(-1)
-        self.pg = create_engine('postgresql://postgres:kingisgod.@192.168.52.219:5432/future')
+        # 调用前需重复调用Create engine 否则报错
+        self.pg = create_engine(self.pg_conn_str)
         with self.pg.connect() as connection:
-            df: DataFrame = pd.read_sql_query(sql, connection)
+            df: DataFrame = read_sql_query(sql, connection)
             connection.close()
         # K线
         if req['Type'] <= 2:
