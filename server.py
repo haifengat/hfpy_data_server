@@ -12,12 +12,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 import time
 import json
-import sys
+from color_log import Logger
 
 
 class Server(object):
 
     def __init__(self, port):
+        self.log = Logger()
         self.pg_conn_str = ''
         cfg = json.load(open('./config.json', 'r', encoding='utf-8'))
         if 'postgres_config' in cfg:
@@ -30,12 +31,15 @@ class Server(object):
         self.server.bind('tcp://*:{}'.format(port))
 
     def run(self):
-        print('listen to port: {}'.format(self.server.LAST_ENDPOINT.decode()))
+        self.log.war('listen to port: {}'.format(self.server.LAST_ENDPOINT.decode()))
         while True:
             request = self.server.recv_json()  # .recv_string()
-            print(request)
+            self.log.info(request)
             # Min, Day, Real, Time, Product, TradeDate, InstrumentInfo, Instrumet888, Rate000
             rsp = self.read_data(request)
+            if rsp == '':
+                self.log.error('{} 未取得数据'.format(request))
+                continue
             rsp = gzip.compress(rsp.encode(), 9)
             self.server.send(rsp)
 
@@ -60,7 +64,7 @@ class Server(object):
         elif req['Type'] == 8:  # rate000
             sql = 'select instrument, rate from future_config.rate_000'
         else:
-            sys.exit(-1)
+            return ''
         # 调用前需重复调用Create engine 否则报错
         self.pg = create_engine(self.pg_conn_str)
         with self.pg.connect() as connection:
@@ -101,11 +105,6 @@ class Server(object):
         return rtn
 
 
-def main():
+if __name__ == '__main__':
     s = Server(5055)
     s.run()
-
-
-if __name__ == '__main__':
-    main()
-    input()
