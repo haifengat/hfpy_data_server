@@ -68,7 +68,7 @@ class Server(object):
             connection.close()
         # K线
         if req['Type'] <= 2:
-            df['_id'] = df['_id'].apply(lambda x: x[0:4] + x[5:7] + x[8:])  # ==> yyyyMMdd HH:mm:ss
+            # 20181010 采用yyyy-mm-dd格式,无需转换.df['_id'] = df['_id'].apply(lambda x: ''.format(x[0:4] + x[5:7] + x[8:]))  # ==> yyyyMMdd HH:mm:ss
             if req['Type'] == 1:  # 日线
                 df_tmp: DataFrame = DataFrame()
                 g = df.groupby(by=df['Tradingday'])
