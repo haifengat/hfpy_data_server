@@ -42,7 +42,6 @@ class Server(object):
                 rsp = self.read_data(request)
                 if rsp == '':
                     self.log.error('{} 未取得数据'.format(request))
-                    continue
                 rsp = gzip.compress(rsp.encode(), 9)
                 self.server.send(rsp)
             except Exception as err:
@@ -82,7 +81,12 @@ class Server(object):
         # with (self.ora.raw_connection() if req['Type'] in [4, 6] else self.pg.raw_connection()) as connection:
         # connection = self.ora.raw_connection() if req['Type'] in [4, 6] else self.pg.raw_connection()
         en = self.ora if req['Type'] in [4, 6] else self.pg
-        df: DataFrame = read_sql_query(sql, en)
+        df: DataFrame = None
+        try:
+            df = read_sql_query(sql, en)
+        except Exception as err:
+            # self.log.error(str(err))
+            return ''
         # K线
         if req['Type'] <= 2:
             # 20181010 采用yyyy-mm-dd格式,无需转换.df['_id'] = df['_id'].apply(lambda x: ''.format(x[0:4] + x[5:7] + x[8:]))  # ==> yyyyMMdd HH:mm:ss
