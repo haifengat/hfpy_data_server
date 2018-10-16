@@ -79,14 +79,16 @@ class Server(object):
         # if self.ora is not None:
         #     self.ora = create_engine(self.ora.url)
         # with (self.ora.raw_connection() if req['Type'] in [4, 6] else self.pg.raw_connection()) as connection:
-        # connection = self.ora.raw_connection() if req['Type'] in [4, 6] else self.pg.raw_connection()
         en = self.ora if req['Type'] in [4, 6] else self.pg
+        connection = en.raw_connection() if req['Type'] in [4, 6] else en.raw_connection()
         df: DataFrame = None
         try:
-            df = read_sql_query(sql, en)
+            df = read_sql_query(sql, connection)
         except Exception as err:
-            # self.log.error(str(err))
+            self.log.error(str(err))
             return ''
+        finally:
+            connection.close()
         # K线
         if req['Type'] <= 2:
             # 20181010 采用yyyy-mm-dd格式,无需转换.df['_id'] = df['_id'].apply(lambda x: ''.format(x[0:4] + x[5:7] + x[8:]))  # ==> yyyyMMdd HH:mm:ss
