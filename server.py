@@ -61,7 +61,7 @@ class Server(object):
             sql = '''select "GroupId", "WorkingTimes" from (select "GroupId", "WorkingTimes"::json , row_number() over (partition by "GroupId" order by "OpenDate" desc) as rk from future_config.tradingtime) as t where t.rk = 1'''
         elif req['Type'] == 4:  # Product==>instrument用了外联oracle所以查询 > 10s
             # sql = '''select * from (select productid as "_id", pricetick as "PriceTick", volumemultiple::int as "VolumeTuple", exchangeid as "ExchangeID", productclass as "ProductType", row_number() over (partition by productid order by opendate desc) as rk from future_config.instrument where expiredate > '{}') as t where t.rk = 1'''.format(time.strftime('%Y%m%d', time.localtime()))
-            sql = '''select * from (select trim(productid) as "_id", pricetick as "PriceTick", volumemultiple as "VolumeTuple", trim(exchangeid) as "ExchangeID", productclass as "ProductType", row_number() over (partition by productid order by opendate desc) as rk from SOURCETMP.T_INSTRUMENT where expiredate > '{}')  t where t.rk = 1'''.format(time.strftime('%Y%m%d', time.localtime()))
+            sql = '''select * from (select trim(productid) as "_id", pricetick as "PriceTick", volumemultiple as "VolumeTuple", trim(exchangeid) as "ExchangeID", productclass as "ProductType", MAXLIMITORDERVOLUME, row_number() over (partition by productid order by opendate desc) as rk from SOURCETMP.T_INSTRUMENT where expiredate > '{}')  t where t.rk = 1'''.format(time.strftime('%Y%m%d', time.localtime()))
         elif req['Type'] == 5:  # TradeDate
             sql = 'select _id from future_config.trade_date where trading = 1'
         elif req['Type'] == 6:  # InstrumentInfo
