@@ -63,7 +63,7 @@ class Server(object):
             # sql = '''select * from (select productid as "_id", pricetick as "PriceTick", volumemultiple::int as "VolumeTuple", exchangeid as "ExchangeID", productclass as "ProductType", row_number() over (partition by productid order by opendate desc) as rk from future_config.instrument where expiredate > '{}') as t where t.rk = 1'''.format(time.strftime('%Y%m%d', time.localtime()))
             sql = '''select * from (select trim(productid) as "_id", pricetick as "PriceTick", volumemultiple as "VolumeTuple", trim(exchangeid) as "ExchangeID", productclass as "ProductType", MAXLIMITORDERVOLUME, row_number() over (partition by productid order by opendate desc) as rk from SOURCETMP.T_INSTRUMENT where expiredate > '{}')  t where t.rk = 1'''.format(time.strftime('%Y%m%d', time.localtime()))
         elif req['Type'] == 5:  # TradeDate
-            sql = 'select _id from future_config.trade_date where trading = 1'
+            sql = '''SELECT "DAY" as "_id" FROM SOURCETMP.T_CALENDAR WHERE TRA=1 AND DAY < TO_CHAR(SYSDATE+30, 'YYYYMMDD')'''
         elif req['Type'] == 6:  # InstrumentInfo
             # sql = '''select instrumentid as "_id", productid as "ProductID" from future_config.instrument where expiredate > '{0}'  union select productid || '_000' as "_id", productid as "ProductID" from future_config.instrument where expiredate > '{0}'  '''.format(time.strftime('%Y%m%d', time.localtime()))
             sql = '''select trim(instrumentid) as "_id", trim(productid) as "ProductID" from SOURCETMP.T_INSTRUMENT where expiredate > '{0}' union select trim(productid) || '_000' as "_id", trim(productid) as "ProductID" from SOURCETMP.T_INSTRUMENT where expiredate > '{0}' '''.format(time.strftime('%Y%m%d', time.localtime()))
@@ -79,8 +79,8 @@ class Server(object):
         # if self.ora is not None:
         #     self.ora = create_engine(self.ora.url)
         # with (self.ora.raw_connection() if req['Type'] in [4, 6] else self.pg.raw_connection()) as connection:
-        en = self.ora if req['Type'] in [4, 6] else self.pg
-        connection = en.raw_connection() if req['Type'] in [4, 6] else en.raw_connection()
+        en = self.ora if req['Type'] in [4, 5, 6] else self.pg
+        connection = en if req['Type'] in [4, 5, 6] else en.raw_connection()
         df: DataFrame = None
         try:
             df = read_sql_query(sql, connection)
