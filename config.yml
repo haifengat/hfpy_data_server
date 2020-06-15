@@ -1,3 +1,3 @@
 ---
-ora_config: oracle://user4read:user4read0725@192.168.52.12:1521/CRMS
-pg_config: postgresql://postgres:kingisgod.@192.168.52.193:5432/postgres
+ora_config: oracle://user4read:********@192.168.52.12:1521/CRMS
+pg_config: postgresql://postgres:********@192.168.52.193:5432/postgres
