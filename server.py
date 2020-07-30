@@ -4,15 +4,14 @@ __title__ = '数据服务'
 __author__ = 'HaiFeng'
 __mtime__ = '20180911'
 
-import zmq
+import zmq, redis
 import gzip
-from pandas import read_sql_query
+import pandas as pd
 from pandas import DataFrame
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-import time
+import os
 import json
-import yaml
 from color_log import Logger
 
 
@@ -20,13 +19,44 @@ class Server(object):
 
     def __init__(self, port):
         self.log = Logger()
-        cfg = yaml.load(open('./config.yml', 'r', encoding='utf-8'))
+        
+        self.df_time = pd.read_csv('/home/tradingtime.csv', converters={'OpenDate':str})
+        g = self.df_time.groupby(by=['GroupId'])
+        df_tmp = g['OpenDate'].max()
+        self.df_time = self.df_time[self.df_time.apply(lambda x: x['OpenDate']==df_tmp[x['GroupId']], axis=1)]
+
+        self.df_canlendar = pd.read_csv('/home/calendar.csv', converters={'day':str})
+        self.df_canlendar = self.df_canlendar[self.df_canlendar['tra']][['day']]
+        self.df_canlendar.rename(columns={'day':'_id'}, inplace=True)
+
+        df_instrument = pd.read_csv('/home/instrument.csv', converters={'OPENDATE': str, 'EXPIREDATE': str})        
+        # 品种信息
+        # g = df_instrument[df_instrument['EXPIREDATE'] > time.strftime('%Y%m%d', time.localtime())].groupby(by='PRODUCTID')
+        g = df_instrument.groupby(by='PRODUCTID')
+        df = g.first()
+        # productid归到列里
+        self.df_productinfo = df.reset_index()
+        self.df_productinfo.rename(columns={'PRODUCTID':'_id', 'PRICETICK': 'PriceTick', 'VOLUMEMULTIPLE': 'VolumeTuple', 'PRODUCTCLASS': 'ProductType', 'MAXLIMITORDERVOLUME': 'MAXLIMITORDERVOLUME', 'EXCHANGEID': 'ExchangeID'}, inplace=True)
+
+        # 合约对应的品种
+        # df = df_instrument[df_instrument['EXPIREDATE'] > time.strftime('%Y%m%d', time.localtime())][['INSTRUMENTID', 'PRODUCTID']]
+        df = df_instrument[['INSTRUMENTID', 'PRODUCTID']]
+        self.df_inst_proc = df.rename(columns={'INSTRUMENTID':'_id', 'PRODUCTID': 'ProductID'})
+
         self.pg: Engine = None
-        if 'pg_config' in cfg:
-            self.pg = create_engine(cfg['pg_config'])
-        self.ora: Engine = None
-        if 'ora_config' in cfg:
-            self.ora = create_engine(cfg['ora_config'])
+        pg_config = 'postgresql://postgres:123456@127.0.0.1:25432/postgres'
+        if 'pg_config' in os.environ:
+            pg_config = os.environ['pg_config']
+        self.pg = create_engine(pg_config)
+
+        redis_host, rds_port = '127.0.0.1', 16379
+        if 'redis_addr' in os.environ:
+            redis_host = os.environ['redis_addr']
+        if ':' in redis_host:
+            redis_host, rds_port =  redis_host.split(':')
+        self.log.info(f'connecting redis: {redis_host}:{rds_port}')
+        pool = redis.ConnectionPool(host=redis_host, port=rds_port, db=0, decode_responses=True)
+        self.rds = redis.StrictRedis(connection_pool=pool)
 
         context = zmq.Context(1)
         self.server = context.socket(zmq.REP)
@@ -35,60 +65,46 @@ class Server(object):
     def run(self):
         self.log.war('listen to port: {}'.format(self.server.LAST_ENDPOINT.decode()))
         while True:
-            try:
-                request = self.server.recv_json()  # .recv_string()
-                self.log.info(request)
-                # Min, Day, Real, Time, Product, TradeDate, InstrumentInfo, Instrumet888, Rate000
-                rsp = self.read_data(request)
-                if rsp == '':
-                    self.log.error('{} 未取得数据'.format(request))
-                rsp = gzip.compress(rsp.encode(), 9)
-                self.server.send(rsp)
-            except Exception as err:
-                self.log.error(str(err))
-                self.log.error('=== 错误导致程序退出 ===')
-                break
+            request = self.server.recv_json()  # .recv_string()
+            self.log.info(request)
+            # Min, Day, Real, Time, Product, TradeDate, InstrumentInfo, Instrumet888, Rate000
+            rsp = self.read_data(request)
+            if rsp == '':
+                self.log.error('{} 未取得数据'.format(request))
+            rsp = gzip.compress(rsp.encode(), 9)
+            self.server.send(rsp)
+            self.log.info('sent to client.')
 
     def read_data(self, req) -> str:
         """
             Min, Day, Real, Time, Product, TradeDate, InstrumentInfo, Instrumet888, Rate000
         """
-        if req['Type'] in [0, 1]:  # Min, Day
-            sql = 'select "DateTime" as "_id", \'{0}\' as "Instrument", "Tradingday", "High", "Low", "Open", "Close", "Volume"::int, "OpenInterest" from future_min."{0}" where "Tradingday" between \'{1}\' and \'{2}\''.format(req['Instrument'], req['Begin'], req['End'])
+        df: DataFrame = None
+        sql:str = ''
+        if req['Type'] in [0, 1]:  # Min, Day # 注意tradingday的大小写,为兼容旧版本要改为Tradingday
+            sql = f"""select to_char("DateTime", 'YYYY-MM-DD HH24:MI:SS') as "_id", '{req['Instrument']}' as "Instrument", "TradingDay" as "Tradingday", "High", "Low", "Open", "Close", "Volume"::int, "OpenInterest" from future.future_min where "Instrument" = '{req['Instrument']}' and "TradingDay" between '{req['Begin']}' and '{req['End']}'"""
+            df = pd.read_sql_query(sql, self.pg)
         elif req['Type'] == 2:  # Real
-            sql = 'select "DateTime" as "_id", "Instrument", "Tradingday", "High", "Low", "Open", "Close", "Volume"::int, "OpenInterest" from future_min.future_real where "Instrument" = \'{}\''.format(req['Instrument'])
+            if not self.rds.exists(req['Instrument']):
+                return ''
+            json_mins = self.rds.lrange(req['Instrument'], 0, -1)
+            df = pd.read_json(f"[{','.join(json_mins)}]", orient='records')
+            df.rename(columns={'TradingDay': 'Tradingday'}, inplace=True)
+            df.loc[:, 'Instrument'] = req['Instrument']
         elif req['Type'] == 3:  # Time
-            sql = '''select "GroupId", "WorkingTimes" from (select "GroupId", "WorkingTimes"::json , row_number() over (partition by "GroupId" order by "OpenDate" desc) as rk from future_config.tradingtime) as t where t.rk = 1'''
-        elif req['Type'] == 4:  # Product==>instrument用了外联oracle所以查询 > 10s
-            # sql = '''select * from (select productid as "_id", pricetick as "PriceTick", volumemultiple::int as "VolumeTuple", exchangeid as "ExchangeID", productclass as "ProductType", row_number() over (partition by productid order by opendate desc) as rk from future_config.instrument where expiredate > '{}') as t where t.rk = 1'''.format(time.strftime('%Y%m%d', time.localtime()))
-            sql = '''select * from (select trim(productid) as "_id", pricetick as "PriceTick", volumemultiple as "VolumeTuple", trim(exchangeid) as "ExchangeID", productclass as "ProductType", MAXLIMITORDERVOLUME, row_number() over (partition by productid order by opendate desc) as rk from SOURCETMP.T_INSTRUMENT where expiredate > '{}')  t where t.rk = 1'''.format(time.strftime('%Y%m%d', time.localtime()))
+            df = self.df_time
+        elif req['Type'] == 4:  # ProductInfo
+            df = self.df_productinfo
         elif req['Type'] == 5:  # TradeDate
-            sql = '''SELECT "DAY" as "_id" FROM SOURCETMP.T_CALENDAR WHERE TRA=1 AND DAY < TO_CHAR(SYSDATE+30, 'YYYYMMDD')'''
+            df = self.df_canlendar
         elif req['Type'] == 6:  # InstrumentInfo
-            # sql = '''select instrumentid as "_id", productid as "ProductID" from future_config.instrument where expiredate > '{0}'  union select productid || '_000' as "_id", productid as "ProductID" from future_config.instrument where expiredate > '{0}'  '''.format(time.strftime('%Y%m%d', time.localtime()))
-            sql = '''select trim(instrumentid) as "_id", trim(productid) as "ProductID" from SOURCETMP.T_INSTRUMENT where expiredate > '{0}' union select trim(productid) || '_000' as "_id", trim(productid) as "ProductID" from SOURCETMP.T_INSTRUMENT where expiredate > '{0}' '''.format(time.strftime('%Y%m%d', time.localtime()))
+            df = self.df_inst_proc
         elif req['Type'] == 7:  # Instrumet888
             sql = '''select product as "_id", instrument as "value" from (select instrument, product, rate, row_number() over (partition by product order by rate desc) as rk from future_config.rate_000) a where a.rk = 1'''
         elif req['Type'] == 8:  # rate000
             sql = 'select instrument, rate from future_config.rate_000'
         else:
             return ''
-        # 调用前需重复调用Create engine 否则报错: Operation cannot be accomplished in current state
-        if self.pg is not None:
-            self.pg = create_engine(self.pg.url)
-        # if self.ora is not None:
-        #     self.ora = create_engine(self.ora.url)
-        # with (self.ora.raw_connection() if req['Type'] in [4, 6] else self.pg.raw_connection()) as connection:
-        en = self.ora if req['Type'] in [4, 5, 6] else self.pg
-        connection = en if req['Type'] in [4, 5, 6] else en.raw_connection()
-        df: DataFrame = None
-        try:
-            df = read_sql_query(sql, connection)
-        except Exception as err:
-            self.log.error(str(err))
-            return ''
-        finally:
-            connection.close()
         # K线
         if req['Type'] <= 2:
             # 20181010 采用yyyy-mm-dd格式,无需转换.df['_id'] = df['_id'].apply(lambda x: ''.format(x[0:4] + x[5:7] + x[8:]))  # ==> yyyyMMdd HH:mm:ss
@@ -114,7 +130,7 @@ class Server(object):
             rtn = json.dumps(rtn)
         elif req['Type'] in [3, 7]:
             rtn = df.to_json(orient='records')
-            rtn = rtn.replace('"[', '[').replace("']", ']')
+            # rtn = rtn.replace('"[', '[').replace("]\"", ']')
         elif req['Type'] in [0, 1, 2]:
             rtn = df.to_json(orient='records')
         elif req['Type'] == 8:  # => dict

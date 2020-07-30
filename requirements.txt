@@ -1,0 +1,5 @@
+pandas
+redis
+SQLAlchemy
+color_log
+pyzmq
