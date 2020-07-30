@@ -1,0 +1,17 @@
+version: "3.1"
+services:
+    hfpy_data_server:
+        image: haifengat/hfpy_data_server
+        container_name: hfpy_data_server
+        restart: always
+        ports:
+          - 15555:5055
+        environment:
+            - TZ=Asia/Shanghai
+            # 数据服务端口
+            - server_port=5055
+            # redis 实时行情
+            - redis_addr=${redsk_tick}:6379
+            # postgres 历史K线数据
+            - pg_config=postgresql://postgres:123456@${pg_min}:5432/postgres
+

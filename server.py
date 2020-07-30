@@ -49,13 +49,13 @@ class Server(object):
             pg_config = os.environ['pg_config']
         self.pg = create_engine(pg_config)
 
-        redis_host, rds_port = '127.0.0.1', 16379
+        redis_addr, rds_port = '127.0.0.1', 16379
         if 'redis_addr' in os.environ:
-            redis_host = os.environ['redis_addr']
-        if ':' in redis_host:
-            redis_host, rds_port =  redis_host.split(':')
-        self.log.info(f'connecting redis: {redis_host}:{rds_port}')
-        pool = redis.ConnectionPool(host=redis_host, port=rds_port, db=0, decode_responses=True)
+            redis_addr = os.environ['redis_addr']
+            if ':' in redis_addr:
+                redis_addr, rds_port =  redis_addr.split(':')
+        self.log.info(f'connecting redis: {redis_addr}:{rds_port}')
+        pool = redis.ConnectionPool(host=redis_addr, port=rds_port, db=0, decode_responses=True)
         self.rds = redis.StrictRedis(connection_pool=pool)
 
         context = zmq.Context(1)
@@ -142,5 +142,8 @@ class Server(object):
 
 
 if __name__ == '__main__':
-    s = Server(5055)
+    port = 5055
+    if 'port' in os.environ:
+        port = os.environ['port']
+    s = Server(port)
     s.run()
