@@ -36,6 +36,7 @@ COPY requirements.txt /home/
 RUN pip install -r /home/requirements.txt
 ENV pg_config postgresql://postgres:123456@pg_min:5432/postgres
 ENV redis_addr redis_tick:6379
+ENV min_csv_gz_path /home/min_csv_gz
 ENV server_port 5055
 
 ENTRYPOINT ["python", "/home/server.py"]
@@ -56,15 +57,34 @@ services:
         container_name: hfpy_data_server
         restart: always
         ports:
-          - 15555:5055
+            - 15555:5055
         environment:
             - TZ=Asia/Shanghai
             # 数据服务端口
             - server_port=5055
             # redis 实时行情
-            - redis_addr=${redsk_tick}:6379
+            - redis_addr=172.19.129.98:16379
             # postgres 历史K线数据
-            - pg_config=postgresql://postgres:123456@${pg_min}:5432/postgres
+            - pg_config=postgresql://postgres:123456@pg_min:5432/postgres
             # 分钟数据路径
             - min_csv_gz_path=/home/min_csv_gz
+        volumes: 
+            # 分钟数据路径
+            - /mnt/future_min_csv_gz:/home/min_csv_gz
+        depends_on:
+            - pg_min
+
+    # 遇到the database system is starting up错误, 配置数据文件下的postgres.conf,hot_standby=on
+    pg_min:
+        image: postgres:12
+        container_name: pg_min
+        restart: always
+        environment:
+            TZ: "Asia/Shanghai"
+            POSTGRES_PASSWORD: "123456"
+            hot_standby: 'ON'
+        ports:
+            - "25432:5432"
+        volumes:
+            - /mnt/pg_future/pgdata:/var/lib/postgresql/data
 ```

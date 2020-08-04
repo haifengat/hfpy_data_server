@@ -11,19 +11,25 @@ services:
             # 数据服务端口
             - server_port=5055
             # redis 实时行情
-            - redis_addr=${redsk_tick}:6379
+            - redis_addr=172.19.129.98:16379
             # postgres 历史K线数据
-            - pg_config=postgresql://postgres:12345@pg_min:5432/postgres
+            - pg_config=postgresql://postgres:123456@pg_min:5432/postgres
             # 分钟数据路径
             - min_csv_gz_path=/home/min_csv_gz
+        volumes: 
+            - /mnt/future_min_csv_gz:/home/min_csv_gz
+        depends_on:
+            - pg_min
 
+    # 遇到the database system is starting up错误, 配置数据文件下的postgres.conf,hot_standby=on
     pg_min:
         image: postgres:12
         container_name: pg_min
         restart: always
         environment:
-            - TZ=Asia/Shanghai
-            - POSTGRES_PASSWORD=12345
+            TZ: "Asia/Shanghai"
+            POSTGRES_PASSWORD: "123456"
+            hot_standby: 'ON'
         ports:
             - "25432:5432"
         volumes:

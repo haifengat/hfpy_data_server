@@ -9,7 +9,7 @@ import pandas as pd
 from pandas import DataFrame
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-import os, json, time, gzip
+import os, json, time, gzip, threading
 from color_log import Logger
 
 
@@ -183,5 +183,5 @@ if __name__ == '__main__':
     if 'port' in os.environ:
         port = os.environ['port']
     s = Server(port)
-    s.min_csv_pg()
-    # s.run()
+    threading.Thread(target=s.min_csv_pg).start()
+    s.run()
