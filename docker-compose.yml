@@ -5,7 +5,7 @@ services:
         container_name: hfpy_data_server
         restart: always
         ports:
-          - 15555:5055
+            - 15555:5055
         environment:
             - TZ=Asia/Shanghai
             # 数据服务端口
@@ -13,5 +13,18 @@ services:
             # redis 实时行情
             - redis_addr=${redsk_tick}:6379
             # postgres 历史K线数据
-            - pg_config=postgresql://postgres:123456@${pg_min}:5432/postgres
+            - pg_config=postgresql://postgres:12345@pg_min:5432/postgres
+            # 分钟数据路径
+            - min_csv_gz_path=/home/min_csv_gz
 
+    pg_min:
+        image: postgres:12
+        container_name: pg_min
+        restart: always
+        environment:
+            - TZ=Asia/Shanghai
+            - POSTGRES_PASSWORD=12345
+        ports:
+            - "25432:5432"
+        volumes:
+            - /mnt/pg_future/pgdata:/var/lib/postgresql/data

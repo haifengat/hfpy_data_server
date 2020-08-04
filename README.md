@@ -15,8 +15,18 @@
 > * 自行更新
 > * 及时push最新的 docker
 
+### 环境变量
+* server_port
+  * 服务端口
+* redis_addr
+  * 实时行情使用的redis连接地址
+* pg_config
+  * 分钟 postgres 数据库
+* min_csv_gz_path[可选]
+  * 分钟csv文件路径,每日数据导入用.
+
 ### Dockerfile
-```yml
+```dockerfile
 # 基础库中带配置用的csv文件
 FROM haifengat/ctp_real_md
 # 合约信息
@@ -55,4 +65,6 @@ services:
             - redis_addr=${redsk_tick}:6379
             # postgres 历史K线数据
             - pg_config=postgresql://postgres:123456@${pg_min}:5432/postgres
+            # 分钟数据路径
+            - min_csv_gz_path=/home/min_csv_gz
 ```

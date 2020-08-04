@@ -1,5 +1,5 @@
 pandas
-redis
-SQLAlchemy
 color_log
+SQLAlchemy
+redis
 pyzmq

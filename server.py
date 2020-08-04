@@ -5,13 +5,11 @@ __author__ = 'HaiFeng'
 __mtime__ = '20180911'
 
 import zmq, redis
-import gzip
 import pandas as pd
 from pandas import DataFrame
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-import os
-import json
+import os, json, time, gzip
 from color_log import Logger
 
 
@@ -58,9 +56,48 @@ class Server(object):
         pool = redis.ConnectionPool(host=redis_addr, port=rds_port, db=0, decode_responses=True)
         self.rds = redis.StrictRedis(connection_pool=pool)
 
+        self.min_csv_gz_path = '/mnt/future_min_csv_gz'
+        if 'min_csv_gz_path' in os.environ:
+            self.min_csv_gz_path = os.environ['min_csv_gz_path']
+
         context = zmq.Context(1)
         self.server = context.socket(zmq.REP)
         self.server.bind('tcp://*:{}'.format(port))
+
+    def min_csv_pg(self):
+        """分钟数据从csv.gz到postgres
+        """
+        if len(self.min_csv_gz_path) == 0:
+            return
+        ret = self.pg.execute('select max("TradingDay" ) from future.future_min')
+        max_pg_min = ret.fetchone()[0]
+        min_files = [m.split('.')[0] for m in os.listdir(self.min_csv_gz_path)]
+        if len(min_files) > 0:
+            # 存在的数据入库,最后一天会重复处理
+            exists_days = [d for d in min_files if d >= max_pg_min]
+            for day in exists_days:
+                self.min_2_pg(day)
+            max_pg_min = max(exists_days)
+        trading_days = list(self.df_canlendar['_id'])
+        next_day = min([d for d in trading_days if d > max_pg_min])
+        while True:
+            if os.path.exists(os.path.join(self.min_csv_gz_path, f'{next_day}.csv.gz')):
+                # 分钟数据入库
+                self.min_2_pg(next_day)
+                next_day = min([d for d in trading_days if d > next_day])
+            time.sleep(60 * 10)
+
+    def min_2_pg(self, day: str):
+        """分钟csv.gz数据入库
+
+        Args:
+            day (str): 交易日
+        """
+        self.log.info(f'{day} starting...')
+        with gzip.open(os.path.join(self.min_csv_gz_path, f'{day}.csv.gz')) as f_min:
+            df:DataFrame = pd.read_csv(f_min, sep='\t', header=0)
+            df.loc[:, 'TradingDay'] = day
+            df.to_sql('future_min', schema='future', con=self.pg, index=False, if_exists='append')
 
     def run(self):
         self.log.war('listen to port: {}'.format(self.server.LAST_ENDPOINT.decode()))
@@ -146,4 +183,5 @@ if __name__ == '__main__':
     if 'port' in os.environ:
         port = os.environ['port']
     s = Server(port)
-    s.run()
+    s.min_csv_pg()
+    # s.run()
