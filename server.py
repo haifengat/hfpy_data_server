@@ -74,7 +74,7 @@ class Server(object):
         min_files = [m.split('.')[0] for m in os.listdir(self.min_csv_gz_path)]
         if len(min_files) > 0:
             # 存在的数据入库,最后一天会重复处理
-            exists_days = [d for d in min_files if d >= max_pg_min]
+            exists_days = [d for d in min_files if d > max_pg_min]
             for day in exists_days:
                 self.min_2_pg(day)
             max_pg_min = max(exists_days)
