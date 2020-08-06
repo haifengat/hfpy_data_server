@@ -44,13 +44,19 @@ ENTRYPOINT ["python", "/home/server.py"]
 
 ### build
 ```bash
-# 通过github git push触发 hub.docker自动build
-docker pull haifengat/hfpy_data_server && docker tag haifengat/hfpy_data_server haifengat/hfpy_data_server:`date +%Y%m%d` && docker push haifengat/hfpy_data_server:`date +%Y%m%d`
+# XXX通过github git push触发 hub.docker自动build耗时太久(因修改pip指向国内)
+docker build -t haifengat/hfpy_data_server . && docker push haifengat/hfpy_data_server && 
+docker tag haifengat/hfpy_data_server haifengat/hfpy_data_server:`date +%Y%m%d` && docker push haifengat/hfpy_data_server:`date +%Y%m%d`
+```
+
+### 启动
+```bash
+docker-compose --compatibility up -d
 ```
 
 ### docker-compose.yml
 ```yml
-version: "3.1"
+version: "3.7"
 services:
     hfpy_data_server:
         image: haifengat/hfpy_data_server
@@ -69,10 +75,16 @@ services:
             # 分钟数据路径
             - min_csv_gz_path=/home/min_csv_gz
         volumes: 
-            # 分钟数据路径
             - /mnt/future_min_csv_gz:/home/min_csv_gz
         depends_on:
             - pg_min
+        deploy:
+            resources:
+                limits:
+                    cpus: '1'
+                    memory: 2G
+                reservations:
+                    memory: 200M
 
     # 遇到the database system is starting up错误, 配置数据文件下的postgres.conf,hot_standby=on
     pg_min:

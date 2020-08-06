@@ -98,6 +98,7 @@ class Server(object):
             df:DataFrame = pd.read_csv(f_min, sep='\t', header=0)
             df.loc[:, 'TradingDay'] = day
             df.to_sql('future_min', schema='future', con=self.pg, index=False, if_exists='append')
+            self.log.info(f'{day} finish.')
 
     def run(self):
         self.log.war('listen to port: {}'.format(self.server.LAST_ENDPOINT.decode()))
