@@ -1,5 +1,5 @@
 # 基础库中带配置用的csv文件
-FROM haifengat/centos:8.1
+FROM haifengat/ctp_realmd
 # 合约信息
 COPY instrument.csv /home/
 COPY *.py /home/
