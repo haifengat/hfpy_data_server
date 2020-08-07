@@ -107,7 +107,7 @@ services:
         restart: always
         environment:
             - "TZ=Asia/Shanghai"
-            - "redis_addr=redis_tick:6379"
+            - "redis_addr=redis_real:6379"
             - "front_trade=tcp://180.168.146.187:10101"
             - "front_quote=tcp://180.168.146.187:10111"
             - "login_info=008105/1/9999/simnow_client_test/0000000000000000"
@@ -127,5 +127,4 @@ services:
         restart: always
         environment:
             - TZ=Asia/Shanghai
-      
 ```
