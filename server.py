@@ -85,6 +85,7 @@ class Server(object):
                 # 分钟数据入库
                 self.min_2_pg(next_day)
                 next_day = min([d for d in trading_days if d > next_day])
+                continue
             time.sleep(60 * 10)
 
     def min_2_pg(self, day: str):
