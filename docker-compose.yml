@@ -12,7 +12,7 @@ services:
             # 数据服务端口
             - server_port=5055
             # redis 实时行情
-            - redis_addr=172.19.129.98:16379
+            - redis_addr=redis_real:6379
             # postgres 历史K线数据
             - pg_config=postgresql://postgres:123456@pg_min:5432/postgres
             # 分钟数据路径
@@ -21,6 +21,7 @@ services:
             - /mnt/future_min_csv_gz:/home/min_csv_gz
         depends_on:
             - pg_min
+            - redis_real
         deploy:
             resources:
                 limits:
@@ -37,8 +38,35 @@ services:
         environment:
             TZ: "Asia/Shanghai"
             POSTGRES_PASSWORD: "123456"
-            hot_standby: 'ON'
         ports:
             - "25432:5432"
         volumes:
             - /mnt/pg_future/pgdata:/var/lib/postgresql/data
+
+    real_md:
+        image: haifengat/ctp_real_md
+        container_name: real_md
+        restart: always
+        environment:
+            - "TZ=Asia/Shanghai"
+            - "redis_addr=redis_tick:6379"
+            - "front_trade=tcp://180.168.146.187:10101"
+            - "front_quote=tcp://180.168.146.187:10111"
+            - "login_info=008105/1/9999/simnow_client_test/0000000000000000"
+        deploy:
+            resources:
+                limits:
+                    cpus: '1'
+                    memory: 2G
+                reservations:
+                    memory: 200M
+        depends_on:
+            - redis_real
+
+    redis_real:
+        image: redis:6.0.5
+        container_name: redis_real
+        restart: always
+        environment:
+            - TZ=Asia/Shanghai
+      
