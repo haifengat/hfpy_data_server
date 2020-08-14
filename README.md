@@ -128,3 +128,13 @@ services:
         environment:
             - TZ=Asia/Shanghai
 ```
+
+### 历史数据
+* 数据导出
+```bash
+docker exec -it pg_min pg_dump -U postgres |gzip > ./0813.sql.gz
+```
+* 数据导入
+```bash
+gzip -dc ./0813.sql.gz | docker exec -i pg_min psql -U postgres -d postgres
+```

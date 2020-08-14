@@ -80,11 +80,13 @@ class Server(object):
             max_pg_min = max(exists_days)
         trading_days = list(self.df_canlendar['_id'])
         next_day = min([d for d in trading_days if d > max_pg_min])
+        self.log.info(f'{next_day} waiting...')
         while True:
             if os.path.exists(os.path.join(self.min_csv_gz_path, f'{next_day}.csv.gz')):
                 # 分钟数据入库
                 self.min_2_pg(next_day)
                 next_day = min([d for d in trading_days if d > next_day])
+                self.log.info(f'{next_day} waiting...')
                 continue
             time.sleep(60 * 10)
 

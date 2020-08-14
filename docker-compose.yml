@@ -41,7 +41,7 @@ services:
         ports:
             - "25432:5432"
         volumes:
-            - /mnt/pg_future/pgdata:/var/lib/postgresql/data
+            - /mnt/pg_min_data:/var/lib/postgresql/data
 
     real_md:
         image: haifengat/ctp_real_md
