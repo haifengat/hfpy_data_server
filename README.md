@@ -16,7 +16,7 @@
 > * 及时push最新的 docker
 
 ### 环境变量
-* server_port
+* port
   * 服务端口
 * redis_addr
   * 实时行情使用的redis连接地址
@@ -68,7 +68,7 @@ services:
         environment:
             - TZ=Asia/Shanghai
             # 数据服务端口
-            - server_port=5055
+            - port=5055
             # redis 实时行情
             - redis_addr=redis_real:6379
             # postgres 历史K线数据

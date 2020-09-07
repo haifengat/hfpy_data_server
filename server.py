@@ -46,6 +46,7 @@ class Server(object):
         if 'pg_config' in os.environ:
             pg_config = os.environ['pg_config']
         self.pg = create_engine(pg_config)
+        self.log.info(f'connecting pg: {pg_config}')
 
         redis_addr, rds_port = '127.0.0.1', 16379
         if 'redis_addr' in os.environ:
@@ -71,6 +72,7 @@ class Server(object):
             return
         ret = self.pg.execute('select max("TradingDay" ) from future.future_min')
         max_pg_min = ret.fetchone()[0]
+        self.log.info(f'current tradingday in pg: {max_pg_min}')
         min_files = [m.split('.')[0] for m in os.listdir(self.min_csv_gz_path)]
         if len(min_files) > 0:
             # 存在的数据入库,最后一天会重复处理
