@@ -75,11 +75,12 @@ class Server(object):
         self.log.info(f'current tradingday in pg: {max_pg_min}')
         min_files = [m.split('.')[0] for m in os.listdir(self.min_csv_gz_path)]
         if len(min_files) > 0:
-            # 存在的数据入库,最后一天会重复处理
+            # 存在的数据入库
             exists_days = [d for d in min_files if d > max_pg_min]
-            for day in exists_days:
-                self.min_2_pg(day)
-            max_pg_min = max(exists_days)
+            if len(exists_days) > 0:
+                for day in exists_days:
+                    self.min_2_pg(day)
+                max_pg_min = max(exists_days)
         trading_days = list(self.df_canlendar['_id'])
         next_day = min([d for d in trading_days if d > max_pg_min])
         self.log.info(f'{next_day} waiting...')
