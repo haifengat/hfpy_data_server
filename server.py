@@ -186,7 +186,7 @@ class Server(object):
 
 
 if __name__ == '__main__':
-    port = 15555
+    port = 5055
     if 'port' in os.environ:
         port = os.environ['port']
     s = Server(port)

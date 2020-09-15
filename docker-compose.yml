@@ -3,14 +3,14 @@ services:
     # 启动: docker-compose --compatibility up -d
     hfpy_data_server:
         image: haifengat/hfpy_data_server
-        container_name: hfpy_data_server
+        container_name: server
         restart: always
         ports:
             - 15555:5055
         environment:
             - TZ=Asia/Shanghai
             # 数据服务端口
-            - server_port=5055
+            - port=5055
             # redis 实时行情
             - redis_addr=redis_real:6379
             # postgres 历史K线数据
