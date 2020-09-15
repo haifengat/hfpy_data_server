@@ -143,10 +143,10 @@ class Server(object):
             df = self.df_canlendar
         elif req['Type'] == 6:  # InstrumentInfo
             df = self.df_inst_proc
-        elif req['Type'] == 7:  # Instrumet888
-            sql = '''select product as "_id", instrument as "value" from (select instrument, product, rate, row_number() over (partition by product order by rate desc) as rk from future_config.rate_000) a where a.rk = 1'''
-        elif req['Type'] == 8:  # rate000
-            sql = 'select instrument, rate from future_config.rate_000'
+        # elif req['Type'] == 7:  # Instrumet888
+        #     sql = '''select product as "_id", instrument as "value" from (select instrument, product, rate, row_number() over (partition by product order by rate desc) as rk from future_config.rate_000) a where a.rk = 1'''
+        # elif req['Type'] == 8:  # rate000
+        #     sql = 'select instrument, rate from future_config.rate_000'
         else:
             return ''
         # K线
@@ -186,7 +186,7 @@ class Server(object):
 
 
 if __name__ == '__main__':
-    port = 5055
+    port = 15555
     if 'port' in os.environ:
         port = os.environ['port']
     s = Server(port)
