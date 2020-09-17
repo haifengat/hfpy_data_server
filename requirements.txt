@@ -1,5 +1,2 @@
-pandas
-color_log
-SQLAlchemy
-redis
 pyzmq
+numpy
