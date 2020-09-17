@@ -1,2 +1,6 @@
+color_log
+SQLAlchemy
 pyzmq
 pandas
+psycopg2-binary
+redis
