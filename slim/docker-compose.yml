@@ -2,7 +2,7 @@ version: "3.7"
 services:
     # 启动: docker-compose --compatibility up -d
     hfpy_data_server:
-        image: haifengat/hfpy_data_server:slim
+        image: haifengat/hfpy_data_server:slim 
         container_name: server_slim
         restart: always
         # ports:

@@ -18,16 +18,16 @@ class Server(object):
     def __init__(self, port):
         self.log = Logger()
         
-        self.df_time = pd.read_csv('/home/tradingtime.csv', converters={'OpenDate':str})
+        self.df_time = pd.read_csv('./tradingtime.csv', converters={'OpenDate':str})
         g = self.df_time.groupby(by=['GroupId'])
         df_tmp = g['OpenDate'].max()
         self.df_time = self.df_time[self.df_time.apply(lambda x: x['OpenDate']==df_tmp[x['GroupId']], axis=1)]
 
-        self.df_canlendar = pd.read_csv('/home/calendar.csv', converters={'day':str})
+        self.df_canlendar = pd.read_csv('./calendar.csv', converters={'day':str})
         self.df_canlendar = self.df_canlendar[self.df_canlendar['tra']][['day']]
         self.df_canlendar.rename(columns={'day':'_id'}, inplace=True)
 
-        df_instrument = pd.read_csv('/home/instrument.csv', converters={'OPENDATE': str, 'EXPIREDATE': str})        
+        df_instrument = pd.read_csv('./instrument.csv', converters={'OPENDATE': str, 'EXPIREDATE': str})        
         # 品种信息
         # g = df_instrument[df_instrument['EXPIREDATE'] > time.strftime('%Y%m%d', time.localtime())].groupby(by='PRODUCTID')
         g = df_instrument.groupby(by='PRODUCTID')
@@ -57,7 +57,7 @@ class Server(object):
         pool = redis.ConnectionPool(host=redis_addr, port=rds_port, db=0, decode_responses=True)
         self.rds = redis.StrictRedis(connection_pool=pool)
 
-        self.min_csv_gz_path = '/mnt/future_min_csv_gz'
+        self.min_csv_gz_path = ''
         if 'min_csv_gz_path' in os.environ:
             self.min_csv_gz_path = os.environ['min_csv_gz_path']
 
