@@ -3,10 +3,10 @@ services:
     # 启动: docker-compose --compatibility up -d
     hfpy_data_server:
         image: haifengat/hfpy_data_server:slim
-        container_name: server
+        container_name: server_slim
         restart: always
-        ports:
-            - 15555:5055
+        # ports:
+        #     - 15555:5055
         environment:
             - TZ=Asia/Shanghai
             # 数据服务端口
@@ -33,19 +33,19 @@ services:
     # 遇到the database system is starting up错误, 配置数据文件下的postgres.conf,hot_standby=on
     pg_min:
         image: postgres:12-alpine
-        container_name: pg_min
+        container_name: pg_min_slim
         restart: always
         environment:
             TZ: "Asia/Shanghai"
             POSTGRES_PASSWORD: "123456"
-        ports:
-            - "25432:5432"
+        # ports:
+        #     - "25432:5432"
         volumes:
             - /mnt/pg_min_data:/var/lib/postgresql/data
 
     real_md:
         image: haifengat/ctp_real_md:slim
-        container_name: real_md
+        container_name: real_md_slim
         restart: always
         environment:
             - "TZ=Asia/Shanghai"
@@ -65,10 +65,10 @@ services:
 
     redis_real:
         image: redis:6.0.8-alpine3.12
-        container_name: redis_real
+        container_name: redis_real_slim
         restart: always
-        ports:
-            - 16379:6379
+        # ports:
+        #     - 16379:6379
         environment:
             - TZ=Asia/Shanghai
       
