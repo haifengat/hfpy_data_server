@@ -61,9 +61,10 @@ services:
     # 启动: docker-compose --compatibility up -d
     hfpy_data_server:
         image: haifengat/hfpy_data_server
-        container_name: hfpy_data_server
+        container_name: server
         restart: always
         ports:
+            # 与environment中的port对应
             - 15555:5055
         environment:
             - TZ=Asia/Shanghai
@@ -90,16 +91,16 @@ services:
 
     # 遇到the database system is starting up错误, 配置数据文件下的postgres.conf,hot_standby=on
     pg_min:
-        image: postgres:12
+        image: postgres:12-alpine
         container_name: pg_min
         restart: always
         environment:
             TZ: "Asia/Shanghai"
             POSTGRES_PASSWORD: "123456"
-        ports:
-            - "25432:5432"
+        # ports:
+        #     - "25432:5432"
         volumes:
-            - /mnt/pg_future/pgdata:/var/lib/postgresql/data
+            - /mnt/pg_min_data:/var/lib/postgresql/data
 
     real_md:
         image: haifengat/ctp_real_md
@@ -122,9 +123,11 @@ services:
             - redis_real
 
     redis_real:
-        image: redis:6.0.5
+        image: redis:6.0.8-alpine3.12
         container_name: redis_real
         restart: always
+        # ports:
+        #     - 16379:6379
         environment:
             - TZ=Asia/Shanghai
 ```
@@ -132,9 +135,9 @@ services:
 ### 历史数据
 * 数据导出
 ```bash
-docker exec -it pg_min pg_dump -U postgres |gzip > ./0813.sql.gz
+docker exec -it pg_min pg_dump -U postgres |gzip > ./`date +%Y%m%d`.sql.gz
 ```
 * 数据导入
 ```bash
-gzip -dc ./0813.sql.gz | docker exec -i pg_min psql -U postgres -d postgres
+gzip -dc ./`date +%Y%m%d`.sql.gz | docker exec -i pg_min psql -U postgres -d postgres
 ```

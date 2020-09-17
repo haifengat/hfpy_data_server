@@ -6,6 +6,7 @@ services:
         container_name: server
         restart: always
         ports:
+            # 与environment中的port对应
             - 15555:5055
         environment:
             - TZ=Asia/Shanghai
@@ -32,14 +33,14 @@ services:
 
     # 遇到the database system is starting up错误, 配置数据文件下的postgres.conf,hot_standby=on
     pg_min:
-        image: postgres:12
+        image: postgres:12-alpine
         container_name: pg_min
         restart: always
         environment:
             TZ: "Asia/Shanghai"
             POSTGRES_PASSWORD: "123456"
-        ports:
-            - "25432:5432"
+        # ports:
+        #     - "25432:5432"
         volumes:
             - /mnt/pg_min_data:/var/lib/postgresql/data
 
@@ -64,11 +65,11 @@ services:
             - redis_real
 
     redis_real:
-        image: redis:6.0.5
+        image: redis:6.0.8-alpine3.12
         container_name: redis_real
         restart: always
-        ports:
-            - 16379:6379
+        # ports:
+        #     - 16379:6379
         environment:
             - TZ=Asia/Shanghai
       
