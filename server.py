@@ -19,27 +19,26 @@ class Server(object):
         self.log = Logger()
         
         self.df_time = pd.read_csv('tradingtime.csv', converters={'OpenDate':str})
-        g = self.df_time.groupby(by=['GroupId'])
-        df_tmp = g['OpenDate'].max()
-        self.df_time = self.df_time[self.df_time.apply(lambda x: x['OpenDate']==df_tmp[x['GroupId']], axis=1)]
+        # 改用sort values & head
+        self.df_time.sort_values(by=['GroupId', 'OpenDate'], ascending=False, inplace=True)
+        self.df_time = self.df_time.groupby(by=['GroupId']).head(1)[['GroupId', 'WorkingTimes']]
 
         self.df_canlendar = pd.read_csv('calendar.csv', converters={'day':str})
         self.df_canlendar = self.df_canlendar[self.df_canlendar['tra']][['day']]
         self.df_canlendar.rename(columns={'day':'_id'}, inplace=True)
 
+        ## 应改为网络下载及时更新
         df_instrument = pd.read_csv('instrument.csv', converters={'OPENDATE': str, 'EXPIREDATE': str})        
+        # 合约数据(取有效期内的合约)
+        df_instrument = df_instrument[df_instrument['EXPIREDATE'] >= time.strftime('%Y%m%d', time.localtime())]
+        df_instrument.sort_values(by=['PRODUCTID', 'EXPIREDATE'], ascending=True, inplace=True)
+
         # 品种信息
-        # g = df_instrument[df_instrument['EXPIREDATE'] > time.strftime('%Y%m%d', time.localtime())].groupby(by='PRODUCTID')
-        g = df_instrument.groupby(by='PRODUCTID')
-        df = g.first()
-        # productid归到列里
-        self.df_productinfo = df.reset_index()
+        self.df_productinfo = df_instrument.groupby(by='PRODUCTID').head(1)[['PRODUCTID', 'PRICETICK', 'EXCHANGEID', 'VOLUMEMULTIPLE','PRODUCTCLASS','MAXLIMITORDERVOLUME']]
         self.df_productinfo.rename(columns={'PRODUCTID':'_id', 'PRICETICK': 'PriceTick', 'VOLUMEMULTIPLE': 'VolumeTuple', 'PRODUCTCLASS': 'ProductType', 'MAXLIMITORDERVOLUME': 'MAXLIMITORDERVOLUME', 'EXCHANGEID': 'ExchangeID'}, inplace=True)
 
         # 合约对应的品种
-        # df = df_instrument[df_instrument['EXPIREDATE'] > time.strftime('%Y%m%d', time.localtime())][['INSTRUMENTID', 'PRODUCTID']]
-        df = df_instrument[['INSTRUMENTID', 'PRODUCTID']]
-        self.df_inst_proc = df.rename(columns={'INSTRUMENTID':'_id', 'PRODUCTID': 'ProductID'})
+        self.df_inst_proc = df_instrument[['INSTRUMENTID', 'PRODUCTID']].rename(columns={'INSTRUMENTID':'_id', 'PRODUCTID': 'ProductID'})
 
         self.pg: Engine = None
         pg_config = 'postgresql://postgres:123456@127.0.0.1:25432/postgres'
@@ -61,9 +60,36 @@ class Server(object):
         if 'min_csv_gz_path' in os.environ:
             self.min_csv_gz_path = os.environ['min_csv_gz_path']
 
+        self.df_888 = DataFrame()
+        self.df_rate = DataFrame()
+        self.get888()
         context = zmq.Context(1)
         self.server = context.socket(zmq.REP)
         self.server.bind('tcp://*:{}'.format(port))
+
+    def get888(self):
+        """连续合约"""
+        sql = """select "_id", "OpenInterest" from (
+select "Instrument" as "_id", "OpenInterest", row_number() over (partition by "Instrument" order by "DateTime" desc) as rk
+from future.future_min
+where "TradingDay" = (select max("TradingDay") from future.future_min)
+) a
+where rk = 1
+"""
+        df_op = pd.read_sql(sql, self.pg)
+        df_op = df_op.merge(self.df_inst_proc, on='_id')
+        df_op.sort_values(by=['ProductID', 'OpenInterest'], ascending=False, inplace=True)        
+        self.df_888 = df_op.groupby(by=['ProductID']).head(1)[['_id', 'ProductID']]
+
+        # 000
+        df_op.sort_values(by=['ProductID', 'OpenInterest'], ascending=False, inplace=True)
+        ## 取前持仓3名
+        df = df_op.groupby(by=['ProductID']).head(3)[['_id', 'ProductID', 'OpenInterest']]
+        ## 计算品种总持仓
+        df = df.merge(df.groupby(by=['ProductID'])['OpenInterest'].sum(), on='ProductID')
+        ## 计算占比
+        df['rate'] = df['OpenInterest_x'] / df['OpenInterest_y']
+        self.df_rate = df[['_id', 'rate']]
 
     def min_csv_pg(self):
         """分钟数据从csv.gz到postgres
@@ -90,6 +116,8 @@ class Server(object):
                 self.min_2_pg(next_day)
                 next_day = min([d for d in trading_days if d > next_day])
                 self.log.info(f'{next_day} waiting...')
+                # 每日更新888
+                self.get888()
                 continue
             time.sleep(60 * 10)
 
@@ -129,7 +157,11 @@ class Server(object):
             sql = f"""select to_char("DateTime", 'YYYY-MM-DD HH24:MI:SS') as "_id", '{req['Instrument']}' as "Instrument", "TradingDay" as "Tradingday", "High", "Low", "Open", "Close", "Volume"::int, "OpenInterest" from future.future_min where "Instrument" = '{req['Instrument']}' and "TradingDay" between '{req['Begin']}' and '{req['End']}'"""
             df = pd.read_sql_query(sql, self.pg)
         elif req['Type'] == 2:  # Real
-            if not self.rds.exists(req['Instrument']):
+            try:
+                if not self.rds.exists(req['Instrument']):
+                    return ''
+            except:
+                self.log.error('redis is not used.')
                 return ''
             json_mins = self.rds.lrange(req['Instrument'], 0, -1)
             df = pd.read_json(f"[{','.join(json_mins)}]", orient='records')
@@ -143,10 +175,10 @@ class Server(object):
             df = self.df_canlendar
         elif req['Type'] == 6:  # InstrumentInfo
             df = self.df_inst_proc
-        # elif req['Type'] == 7:  # Instrumet888
-        #     sql = '''select product as "_id", instrument as "value" from (select instrument, product, rate, row_number() over (partition by product order by rate desc) as rk from future_config.rate_000) a where a.rk = 1'''
-        # elif req['Type'] == 8:  # rate000
-        #     sql = 'select instrument, rate from future_config.rate_000'
+        elif req['Type'] == 7:  # Instrumet888
+            df = self.df_888
+        elif req['Type'] == 8:  # rate000
+            df = self.df_rate
         else:
             return ''
         # K线
@@ -172,9 +204,12 @@ class Server(object):
         if req['Type'] == 5:
             rtn = [r for r in df['_id']]
             rtn = json.dumps(rtn)
-        elif req['Type'] in [3, 7]:
+        elif req['Type'] == 3:
             rtn = df.to_json(orient='records')
-            # rtn = rtn.replace('"[', '[').replace("]\"", ']')
+            rtn = rtn.replace('\\', '').replace('"[', '[').replace(']"', ']') # 适应C#
+        elif req['Type'] == 7:
+            rtn = df.to_json(orient='records')
+            rtn = rtn.replace('"[', '[').replace(']"', ']')
         elif req['Type'] in [0, 1, 2]:
             rtn = df.to_json(orient='records')
         elif req['Type'] == 8:  # => dict
