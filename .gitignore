@@ -108,7 +108,7 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
-logs*/
+logs/
 *.gz
 dc.yml
 .nfs*

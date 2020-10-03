@@ -12,8 +12,9 @@ RUN set -ex; \
     rm master.zip -rf;
 
 WORKDIR /${PROJECT}-master
-RUN wget https://raw.githubusercontent.com/haifengat/ctp_real_md/master/tradingtime.csv; \
-    wget https://raw.githubusercontent.com/haifengat/ctp_real_md/master/calendar.csv; \
+RUN wget http://data.haifengat.com/tradingtime.csv; \
+    wget http://data.haifengat.com/calendar.csv; \
+    wget http://data.haifengat.com/instrument.csv; \
     pip install --no-cache-dir -r ./requirements.txt;
 
 ENTRYPOINT ["python", "server.py"]

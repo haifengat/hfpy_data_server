@@ -22,24 +22,31 @@
   * 实时行情使用的redis连接地址
 * pg_config
   * 分钟 postgres 数据库
-* min_csv_gz_path[可选]
-  * 分钟csv文件路径,每日数据导入用.
+* <del>min_csv_gz_path[可选]
+  * 分钟csv文件路径,每日数据导入用.</del>
 
 ### Dockerfile
 ```dockerfile
 # 基础库中带配置用的csv文件
-FROM haifengat/ctp_real_md
-# 合约信息
-COPY instrument.csv /home/
-COPY *.py /home/
-COPY requirements.txt /home/
-RUN pip install -r /home/requirements.txt
-ENV pg_config postgresql://postgres:123456@pg_min:5432/postgres
-ENV redis_addr redis_tick:6379
-ENV min_csv_gz_path /home/min_csv_gz
-ENV server_port 5055
+FROM python:3.6.12-slim
 
-ENTRYPOINT ["python", "/home/server.py"]
+ENV PROJECT=hfpy_data_server
+ENV DOWNLOAD_URL "https://github.com/haifengat/${PROJECT}/archive/master.zip"
+
+WORKDIR /
+RUN set -ex; \
+    apt-get update && apt-get install -y --no-install-recommends wget unzip; \
+    wget -O master.zip "${DOWNLOAD_URL}"; \
+    unzip master.zip; \
+    rm master.zip -rf;
+
+WORKDIR /${PROJECT}-master
+RUN wget http://data.haifengat.com/tradingtime.csv; \
+    wget http://data.haifengat.com/calendar.csv; \
+    wget http://data.haifengat.com/instrument.csv; \
+    pip install --no-cache-dir -r ./requirements.txt;
+
+ENTRYPOINT ["python", "server.py"]
 ```
 
 ### build
@@ -64,22 +71,15 @@ services:
         container_name: server
         restart: always
         ports:
-            # 与environment中的port对应
+            # 与environment中的5055对应
             - 15555:5055
         environment:
             - TZ=Asia/Shanghai
-            # 数据服务端口
-            - port=5055
             # redis 实时行情
-            - redis_addr=redis_real:6379
+            - redis_addr=${redis:-redis_real:6379}
             # postgres 历史K线数据
-            - pg_config=postgresql://postgres:123456@pg_min:5432/postgres
-            # 分钟数据路径
-            - min_csv_gz_path=/home/min_csv_gz
-        volumes: 
-            - /mnt/future_min_csv_gz:/home/min_csv_gz
+            - pg_config=postgresql://postgres:123456@${pg:-pg_min:5432}/postgres
         depends_on:
-            - pg_min
             - redis_real
         deploy:
             resources:
@@ -90,17 +90,17 @@ services:
                     memory: 200M
 
     # 遇到the database system is starting up错误, 配置数据文件下的postgres.conf,hot_standby=on
-    pg_min:
-        image: postgres:12-alpine
-        container_name: pg_min
-        restart: always
-        environment:
-            TZ: "Asia/Shanghai"
-            POSTGRES_PASSWORD: "123456"
-        # ports:
-        #     - "25432:5432"
-        volumes:
-            - /mnt/pg_min_data:/var/lib/postgresql/data
+    # pg_min:
+    #     image: postgres:12-alpine
+    #     container_name: pg_min
+    #     restart: always
+    #     environment:
+    #         TZ: "Asia/Shanghai"
+    #         POSTGRES_PASSWORD: "123456"
+    #     ports:
+    #         - "5432:5432"
+    #     volumes:
+    #         - ./data:/var/lib/postgresql/data
 
     real_md:
         image: haifengat/ctp_real_md
@@ -126,8 +126,8 @@ services:
         image: redis:6.0.8-alpine3.12
         container_name: redis_real
         restart: always
-        # ports:
-        #     - 16379:6379
+        ports:
+            - 6379:6379
         environment:
             - TZ=Asia/Shanghai
 ```

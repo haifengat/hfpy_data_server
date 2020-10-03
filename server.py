@@ -91,48 +91,48 @@ where rk = 1
         df['rate'] = df['OpenInterest_x'] / df['OpenInterest_y']
         self.df_rate = df[['_id', 'rate']]
 
-    def min_csv_pg(self):
-        """分钟数据从csv.gz到postgres
-        """
-        if len(self.min_csv_gz_path) == 0:
-            return
-        ret = self.pg.execute('select max("TradingDay" ) from future.future_min')
-        max_pg_min = ret.fetchone()[0]
-        self.log.info(f'current tradingday in pg: {max_pg_min}')
-        min_files = [m.split('.')[0] for m in os.listdir(self.min_csv_gz_path)]
-        if len(min_files) > 0:
-            # 存在的数据入库
-            exists_days = [d for d in min_files if d > max_pg_min]
-            if len(exists_days) > 0:
-                for day in exists_days:
-                    self.min_2_pg(day)
-                max_pg_min = max(exists_days)
-        trading_days = list(self.df_canlendar['_id'])
-        next_day = min([d for d in trading_days if d > max_pg_min])
-        self.log.info(f'{next_day} waiting...')
-        while True:
-            if os.path.exists(os.path.join(self.min_csv_gz_path, f'{next_day}.csv.gz')):
-                # 分钟数据入库
-                self.min_2_pg(next_day)
-                next_day = min([d for d in trading_days if d > next_day])
-                self.log.info(f'{next_day} waiting...')
-                # 每日更新888
-                self.get888()
-                continue
-            time.sleep(60 * 10)
+    # def min_csv_pg(self):
+    #     """分钟数据从csv.gz到postgres
+    #     """
+    #     if len(self.min_csv_gz_path) == 0:
+    #         return
+    #     ret = self.pg.execute('select max("TradingDay" ) from future.future_min')
+    #     max_pg_min = ret.fetchone()[0]
+    #     self.log.info(f'current tradingday in pg: {max_pg_min}')
+    #     min_files = [m.split('.')[0] for m in os.listdir(self.min_csv_gz_path)]
+    #     if len(min_files) > 0:
+    #         # 存在的数据入库
+    #         exists_days = [d for d in min_files if d > max_pg_min]
+    #         if len(exists_days) > 0:
+    #             for day in exists_days:
+    #                 self.min_2_pg(day)
+    #             max_pg_min = max(exists_days)
+    #     trading_days = list(self.df_canlendar['_id'])
+    #     next_day = min([d for d in trading_days if d > max_pg_min])
+    #     self.log.info(f'{next_day} waiting...')
+    #     while True:
+    #         if os.path.exists(os.path.join(self.min_csv_gz_path, f'{next_day}.csv.gz')):
+    #             # 分钟数据入库
+    #             self.min_2_pg(next_day)
+    #             next_day = min([d for d in trading_days if d > next_day])
+    #             self.log.info(f'{next_day} waiting...')
+    #             # 每日更新888
+    #             self.get888()
+    #             continue
+    #         time.sleep(60 * 10)
 
-    def min_2_pg(self, day: str):
-        """分钟csv.gz数据入库
+    # def min_2_pg(self, day: str):
+    #     """分钟csv.gz数据入库
 
-        Args:
-            day (str): 交易日
-        """
-        self.log.info(f'{day} starting...')
-        with gzip.open(os.path.join(self.min_csv_gz_path, f'{day}.csv.gz')) as f_min:
-            df:DataFrame = pd.read_csv(f_min, sep='\t', header=0)
-            df.loc[:, 'TradingDay'] = day
-            df.to_sql('future_min', schema='future', con=self.pg, index=False, if_exists='append')
-            self.log.info(f'{day} finish.')
+    #     Args:
+    #         day (str): 交易日
+    #     """
+    #     self.log.info(f'{day} starting...')
+    #     with gzip.open(os.path.join(self.min_csv_gz_path, f'{day}.csv.gz')) as f_min:
+    #         df:DataFrame = pd.read_csv(f_min, sep='\t', header=0)
+    #         df.loc[:, 'TradingDay'] = day
+    #         df.to_sql('future_min', schema='future', con=self.pg, index=False, if_exists='append')
+    #         self.log.info(f'{day} finish.')
 
     def run(self):
         self.log.war('listen to port: {}'.format(self.server.LAST_ENDPOINT.decode()))
@@ -225,5 +225,7 @@ if __name__ == '__main__':
     if 'port' in os.environ:
         port = os.environ['port']
     s = Server(port)
-    threading.Thread(target=s.min_csv_pg).start()
+    # threading.Thread(target=s.min_csv_pg).start()
     s.run()
+ 
+ 
